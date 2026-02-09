@@ -109,6 +109,7 @@ function handleConnection(
     io.emit("game:patch", {
       painted: result.painted,
       players: result.players,
+      map: result.map,
     });
     socket.emit("game:self", { self: result.self });
   });
