@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc -b && tsc -p tsconfig.server.json --noEmit && vite build",
     "preview": "vite preview",
-    "server": "node server/index.mjs"
+    "server": "tsx server/index.ts"
   },
   "repository": {
     "type": "git",
@@ -29,12 +30,19 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.13.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.2.2",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.8"
   }

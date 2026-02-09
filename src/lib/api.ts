@@ -3,6 +3,10 @@ export type AuthResponse = {
   token: string;
 };
 
+export type MeResponse = {
+  user: { uid: string; name: string; team: string };
+};
+
 export async function postJson<T>(
   url: string,
   body: Record<string, unknown>,
@@ -28,4 +32,22 @@ export function saveToken(token: string) {
 
 export function getToken() {
   return localStorage.getItem("token");
+}
+
+export function clearToken() {
+  localStorage.removeItem("token");
+}
+
+export async function getMe(token: string): Promise<MeResponse> {
+  const res = await fetch("/api/me", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    const message = data?.error || "Request failed";
+    throw new Error(message);
+  }
+
+  return data as MeResponse;
 }

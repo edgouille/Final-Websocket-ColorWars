@@ -4,29 +4,57 @@ import sqlite3 from "sqlite3";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const dbPath = path.join(__dirname, "data.sqlite");
 const db = new sqlite3.Database(dbPath);
 
-export function run(sql, params = []) {
+export type UserRow = {
+  uid: string;
+  name: string;
+  team: string;
+  password_hash: string;
+};
+
+type TableInfoRow = {
+  name: string;
+};
+
+export function run(sql: string, params: unknown[] = []): Promise<sqlite3.RunResult> {
   return new Promise((resolve, reject) => {
     db.run(sql, params, function onRun(err) {
-      if (err) reject(err);
-      else resolve(this);
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(this);
     });
   });
 }
 
-export function get(sql, params = []) {
+export function get<T>(sql: string, params: unknown[] = []): Promise<T | undefined> {
   return new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(row as T | undefined);
     });
   });
 }
 
-export async function initDb() {
+function all<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(rows as T[]);
+    });
+  });
+}
+
+export async function initDb(): Promise<void> {
   await run(
     `CREATE TABLE IF NOT EXISTS users (
       uid TEXT PRIMARY KEY,
@@ -36,14 +64,9 @@ export async function initDb() {
     )`,
   );
 
-  const columns = await new Promise((resolve, reject) => {
-    db.all("PRAGMA table_info(users)", (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+  const columns = await all<TableInfoRow>("PRAGMA table_info(users)");
+  const hasUid = columns.some((column) => column.name === "uid");
 
-  const hasUid = columns.some((c) => c.name === "uid");
   if (!hasUid && columns.length > 0) {
     await run(
       `CREATE TABLE IF NOT EXISTS users_new (

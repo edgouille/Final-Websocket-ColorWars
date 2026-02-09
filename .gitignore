@@ -7,6 +7,9 @@ dist-ssr/
 
 # Vite cache
 .vite/
+vite.config.js
+vite.config.d.ts
+*.tsbuildinfo
 
 # Environment files
 .env
