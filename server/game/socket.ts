@@ -52,6 +52,7 @@ export function registerGameSocket(httpServer: HttpServer): void {
   const chatMessages: ChatHistoryPayload["messages"] = [];
   const teamChatMessages = new Map<string, TeamChatHistoryPayload["messages"]>();
   const maxChatMessages = 100;
+  const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   io.use((socket, next) => {
     const token = String(socket.handshake.auth?.token ?? "");
@@ -70,6 +71,14 @@ export function registerGameSocket(httpServer: HttpServer): void {
 
   io.on("connection", (socket) => {
     handleConnection(io, game, socket, chatMessages, teamChatMessages, maxChatMessages);
+    const uid = socket.data.user.uid;
+    const pending = disconnectTimers.get(uid);
+    if (pending) {
+      clearTimeout(pending);
+      disconnectTimers.delete(uid);
+    }
+
+    //handleConnection(io, game, socket, disconnectTimers);
   });
 
   setInterval(() => {
@@ -87,8 +96,9 @@ function handleConnection(
   chatMessages: ChatHistoryPayload["messages"],
   teamChatMessages: Map<string, TeamChatHistoryPayload["messages"]>,
   maxChatMessages: number,
+  disconnectTimers: Map<string, ReturnType<typeof setTimeout>>,
 ): void {
-  const joined = game.addPlayer(socket.id, socket.data.user);
+  const joined = game.connectPlayer(socket.id, socket.data.user);
   if (!joined) {
     socket.emit("game:reject", { reason: "Map is full" });
     socket.disconnect(true);
@@ -106,6 +116,14 @@ function handleConnection(
   socket.join(teamRoom);
   const teamMessages = getTeamBuffer(teamChatMessages, teamRoom);
   socket.emit("chat:team:history", { messages: teamMessages });
+  if (joined.kind === "spawn") {
+    socket.broadcast.emit("game:patch", {
+      painted: joined.painted,
+      players: game.getPublicPlayers(),
+    });
+  } else {
+    io.emit("game:players", { players: game.getPublicPlayers() });
+  }
 
   socket.on("game:move", (direction) => {
     const result = game.move(socket.id, direction);
@@ -121,6 +139,7 @@ function handleConnection(
     io.emit("game:patch", {
       painted: result.painted,
       players: result.players,
+      map: result.map,
     });
     socket.emit("game:self", { self: result.self });
   });
@@ -177,11 +196,22 @@ function handleConnection(
   });
 
   socket.on("disconnect", () => {
-    const removed = game.removePlayer(socket.id);
-    if (!removed) {
-      return;
+    const uid = socket.data.user.uid;
+    const existingTimer = disconnectTimers.get(uid);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
     }
-    io.emit("game:players", { players: game.getPublicPlayers() });
+
+    const timer = setTimeout(() => {
+      disconnectTimers.delete(uid);
+      const removed = game.removePlayer(socket.id);
+      if (!removed) {
+        return;
+      }
+      io.emit("game:players", { players: game.getPublicPlayers() });
+    }, 3000);
+
+    disconnectTimers.set(uid, timer);
   });
 }
 

@@ -29,6 +29,7 @@ type MoveResult =
       painted: { x: number; y: number; teamIndex: TeamIndex };
       players: RemotePlayer[];
       self: SelfState;
+      map?: number[];
     };
 
 const DIRECTION_VECTORS: Record<Direction, readonly [number, number]> = {
@@ -41,6 +42,7 @@ const DIRECTION_VECTORS: Record<Direction, readonly [number, number]> = {
 export class GameState {
   private readonly map: Int16Array = new Int16Array(MAP_SIZE * MAP_SIZE).fill(-1);
   private readonly playersBySocket = new Map<string, PlayerState>();
+  private readonly playersByUid = new Map<string, PlayerState>();
   private readonly occupiedByIndex = new Map<number, string>();
 
   private toIndex(x: number, y: number): number {
@@ -116,6 +118,73 @@ export class GameState {
     return Math.max(0, MOVE_REGEN_MS - (now - player.lastRegenAt));
   }
 
+  private fillCapturedAreas(teamIndex: TeamIndex): boolean {
+    const size = MAP_SIZE;
+    const total = size * size;
+    const reachable = new Uint8Array(total);
+    const queue: number[] = [];
+
+    const tryEnqueue = (index: number): void => {
+      if (reachable[index] === 1 || this.map[index] === teamIndex) {
+        return;
+      }
+      reachable[index] = 1;
+      queue.push(index);
+    };
+
+    for (let x = 0; x < size; x += 1) {
+      tryEnqueue(x);
+      tryEnqueue((size - 1) * size + x);
+    }
+    for (let y = 0; y < size; y += 1) {
+      tryEnqueue(y * size);
+      tryEnqueue(y * size + (size - 1));
+    }
+
+    let cursor = 0;
+    while (cursor < queue.length) {
+      const index = queue[cursor];
+      cursor += 1;
+
+      const x = index % size;
+      const y = Math.floor(index / size);
+      if (x > 0) {
+        tryEnqueue(index - 1);
+      }
+      if (x < size - 1) {
+        tryEnqueue(index + 1);
+      }
+      if (y > 0) {
+        tryEnqueue(index - size);
+      }
+      if (y < size - 1) {
+        tryEnqueue(index + size);
+      }
+      if (x > 0 && y > 0) {
+        tryEnqueue(index - size - 1);
+      }
+      if (x < size - 1 && y > 0) {
+        tryEnqueue(index - size + 1);
+      }
+      if (x > 0 && y < size - 1) {
+        tryEnqueue(index + size - 1);
+      }
+      if (x < size - 1 && y < size - 1) {
+        tryEnqueue(index + size + 1);
+      }
+    }
+
+    let changed = false;
+    for (let i = 0; i < total; i += 1) {
+      if (this.map[i] !== teamIndex && reachable[i] === 0) {
+        this.map[i] = teamIndex;
+        changed = true;
+      }
+    }
+
+    return changed;
+  }
+
   private toSelfState(player: PlayerState, now = Date.now()): SelfState {
     return {
       id: player.socketId,
@@ -136,10 +205,31 @@ export class GameState {
     }));
   }
 
-  public addPlayer(
+  public connectPlayer(
     socketId: string,
     user: AuthUser,
-  ): { player: PlayerState; init: GameInitPayload; painted: { x: number; y: number; teamIndex: TeamIndex } } | null {
+  ):
+    | { kind: "spawn"; init: GameInitPayload; painted: { x: number; y: number; teamIndex: TeamIndex } }
+    | { kind: "reconnect"; init: GameInitPayload }
+    | null {
+    const existing = this.playersByUid.get(user.uid);
+    if (existing) {
+      this.playersBySocket.delete(existing.socketId);
+      existing.socketId = socketId;
+      this.playersBySocket.set(socketId, existing);
+
+      return {
+        kind: "reconnect",
+        init: {
+          mapSize: MAP_SIZE,
+          map: Array.from(this.map),
+          teams: TEAMS,
+          players: this.getPublicPlayers(),
+          self: this.toSelfState(existing),
+        },
+      };
+    }
+
     const teamIndex = this.pickLeastPopulatedTeam();
     const position = this.randomFreePosition();
     if (!position) {
@@ -159,11 +249,12 @@ export class GameState {
     };
 
     this.playersBySocket.set(socketId, player);
+    this.playersByUid.set(user.uid, player);
     this.occupiedByIndex.set(spawnIndex, socketId);
     this.map[spawnIndex] = teamIndex;
 
     return {
-      player,
+      kind: "spawn",
       init: {
         mapSize: MAP_SIZE,
         map: Array.from(this.map),
@@ -183,6 +274,7 @@ export class GameState {
 
     this.occupiedByIndex.delete(this.toIndex(player.x, player.y));
     this.playersBySocket.delete(socketId);
+    this.playersByUid.delete(player.uid);
     return true;
   }
 
@@ -224,11 +316,13 @@ export class GameState {
     }
 
     this.map[nextIndex] = player.teamIndex;
+    const captured = this.fillCapturedAreas(player.teamIndex);
     return {
       ok: true,
       painted: { x: nextX, y: nextY, teamIndex: player.teamIndex },
       players: this.getPublicPlayers(),
       self: this.toSelfState(player, now),
+      map: captured ? Array.from(this.map) : undefined,
     };
   }
 

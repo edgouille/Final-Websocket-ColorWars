@@ -39,6 +39,7 @@ export function useGameSession(token: string | null): {
   const [state, setState] = useState<GameClientState>(initialState);
   const socketRef = useRef<Socket | null>(null);
   const mapSizeRef = useRef(200);
+  const errorTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -93,23 +94,32 @@ export function useGameSession(token: string | null): {
         teams: payload.teams.map((team) => ({ name: team.name, color: team.color })),
         players: payload.players,
         self: payload.self,
+        error: "",
       }));
     });
 
     socket.on("game:patch", (payload: GamePatchPayload) => {
       setState((prev) => {
         if (prev.map.length === 0) {
-          return { ...prev, players: payload.players };
+          return {
+            ...prev,
+            map: payload.map ?? prev.map,
+            players: payload.players,
+            error: "",
+          };
         }
 
-        const nextMap = [...prev.map];
-        const index = payload.painted.y * mapSizeRef.current + payload.painted.x;
-        nextMap[index] = payload.painted.teamIndex;
+        const nextMap = payload.map ? [...payload.map] : [...prev.map];
+        if (!payload.map) {
+          const index = payload.painted.y * mapSizeRef.current + payload.painted.x;
+          nextMap[index] = payload.painted.teamIndex;
+        }
 
         return {
           ...prev,
           map: nextMap,
           players: payload.players,
+          error: "",
         };
       });
     });
@@ -119,7 +129,7 @@ export function useGameSession(token: string | null): {
     });
 
     socket.on("game:self", (payload: SelfUpdatePayload) => {
-      setState((prev) => ({ ...prev, self: payload.self }));
+      setState((prev) => ({ ...prev, self: payload.self, error: "" }));
     });
 
     socket.on("chat:history", (payload: ChatHistoryPayload) => {
@@ -139,10 +149,24 @@ export function useGameSession(token: string | null): {
     });
 
     socket.on("game:reject", (payload: { reason: string }) => {
+      if (payload.reason === "No moves available") {
+        return;
+      }
       setState((prev) => ({ ...prev, error: payload.reason }));
+      if (errorTimeoutRef.current !== null) {
+        window.clearTimeout(errorTimeoutRef.current);
+      }
+      errorTimeoutRef.current = window.setTimeout(() => {
+        setState((prev) => ({ ...prev, error: "" }));
+        errorTimeoutRef.current = null;
+      }, 1500);
     });
 
     return () => {
+      if (errorTimeoutRef.current !== null) {
+        window.clearTimeout(errorTimeoutRef.current);
+        errorTimeoutRef.current = null;
+      }
       socket.disconnect();
       socketRef.current = null;
     };
