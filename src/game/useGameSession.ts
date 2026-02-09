@@ -37,18 +37,22 @@ export function useGameSession(token: string | null): {
   sendTeamChat: (payload: TeamChatSendPayload) => void;
 } {
   const [state, setState] = useState<GameClientState>(initialState);
+  const [isAuthed, setIsAuthed] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const mapSizeRef = useRef(200);
   const errorTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!token) {
+      setIsAuthed(false);
+      setState(initialState);
       return;
     }
 
     getMe(token)
       .then((res) => {
         setState((prev) => ({ ...prev, name: res.user.name, userTeam: res.user.team }));
+        setIsAuthed(true);
       })
       .catch(() => {
         clearToken();
@@ -57,7 +61,7 @@ export function useGameSession(token: string | null): {
   }, [token]);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !isAuthed) {
       return;
     }
 
@@ -110,7 +114,7 @@ export function useGameSession(token: string | null): {
         }
 
         const nextMap = payload.map ? [...payload.map] : [...prev.map];
-        if (!payload.map) {
+        if (!payload.map && payload.painted) {
           const index = payload.painted.y * mapSizeRef.current + payload.painted.x;
           nextMap[index] = payload.painted.teamIndex;
         }
@@ -170,7 +174,7 @@ export function useGameSession(token: string | null): {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token]);
+  }, [token, isAuthed]);
 
   const emitMove = useCallback((direction: Direction): void => {
     socketRef.current?.emit("game:move", direction);

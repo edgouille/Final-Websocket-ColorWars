@@ -68,6 +68,14 @@ export class GameState {
     return minIndex as TeamIndex;
   }
 
+  private teamIndexFromName(name: string): TeamIndex | null {
+    const index = TEAMS.findIndex((team) => team.name === name);
+    if (index < 0) {
+      return null;
+    }
+    return index as TeamIndex;
+  }
+
   private randomFreePosition(): { x: number; y: number } | null {
     const max = MAP_SIZE * MAP_SIZE;
     if (this.occupiedByIndex.size >= max) {
@@ -230,7 +238,8 @@ export class GameState {
       };
     }
 
-    const teamIndex = this.pickLeastPopulatedTeam();
+    const preferredTeam = this.teamIndexFromName(user.team);
+    const teamIndex = preferredTeam ?? this.pickLeastPopulatedTeam();
     const position = this.randomFreePosition();
     if (!position) {
       return null;

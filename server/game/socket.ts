@@ -15,6 +15,7 @@ import type {
   RejectPayload,
   SelfUpdatePayload,
 } from "../../shared/game.js";
+import { TEAMS, type TeamName } from "../../shared/game.js";
 import { verifyToken } from "../auth.js";
 import type { AuthUser } from "../types/auth.js";
 import { GameState } from "./state.js";
@@ -39,6 +40,7 @@ type ClientToServerEvents = {
 
 type SocketData = {
   user: AuthUser;
+  teamName?: TeamName;
 };
 
 export function registerGameSocket(httpServer: HttpServer): void {
@@ -70,7 +72,15 @@ export function registerGameSocket(httpServer: HttpServer): void {
   });
 
   io.on("connection", (socket) => {
-    handleConnection(io, game, socket, chatMessages, teamChatMessages, maxChatMessages);
+    handleConnection(
+      io,
+      game,
+      socket,
+      chatMessages,
+      teamChatMessages,
+      maxChatMessages,
+      disconnectTimers,
+    );
     const uid = socket.data.user.uid;
     const pending = disconnectTimers.get(uid);
     if (pending) {
@@ -112,7 +122,10 @@ function handleConnection(
   });
   socket.emit("chat:history", { messages: chatMessages });
 
-  const teamRoom = getTeamRoom(socket.data.user.team);
+  const teamName =
+    TEAMS[joined.init.self.teamIndex]?.name ?? socket.data.user.team;
+  socket.data.teamName = teamName;
+  const teamRoom = getTeamRoom(teamName);
   socket.join(teamRoom);
   const teamMessages = getTeamBuffer(teamChatMessages, teamRoom);
   socket.emit("chat:team:history", { messages: teamMessages });
@@ -155,7 +168,7 @@ function handleConnection(
       user: {
         id: socket.data.user.uid,
         name: socket.data.user.name,
-        team: socket.data.user.team,
+        team: socket.data.teamName ?? socket.data.user.team,
       },
       text: text.slice(0, 280),
       createdAt: Date.now(),
@@ -180,7 +193,7 @@ function handleConnection(
       user: {
         id: socket.data.user.uid,
         name: socket.data.user.name,
-        team: socket.data.user.team,
+        team: socket.data.teamName ?? socket.data.user.team,
       },
       text: text.slice(0, 280),
       createdAt: Date.now(),
@@ -215,7 +228,7 @@ function handleConnection(
   });
 }
 
-function getTeamRoom(team: string): string {
+function getTeamRoom(team: TeamName): string {
   return `team:${team}`;
 }
 

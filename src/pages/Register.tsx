@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { TEAMS, type TeamName } from "../../shared/game";
 import { postJson, saveToken } from "../lib/api";
 
 export default function Register() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [team, setTeam] = useState("");
+  const [team, setTeam] = useState<TeamName>(TEAMS[0].name);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -53,12 +54,17 @@ export default function Register() {
         </label>
         <label className="field">
           <span>Team</span>
-          <input
+          <select
             value={team}
-            onChange={(e) => setTeam(e.target.value)}
-            autoComplete="organization"
+            onChange={(e) => setTeam(e.target.value as TeamName)}
             required
-          />
+          >
+            {TEAMS.map((t) => (
+              <option key={t.name} value={t.name}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         </label>
         {error && <p className="error">{error}</p>}
         <button className="primary-btn" type="submit" disabled={loading}>

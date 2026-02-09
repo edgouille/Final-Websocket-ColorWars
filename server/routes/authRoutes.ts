@@ -4,6 +4,7 @@ import { Router } from "express";
 import { authMiddleware, createToken } from "../auth.js";
 import { get, run, type UserRow } from "../db.js";
 import type { LoginBody, RegisterBody } from "../types/auth.js";
+import { TEAM_NAMES } from "../../shared/game.js";
 
 export function createAuthRouter(): Router {
   const router = Router();
@@ -17,6 +18,10 @@ export function createAuthRouter(): Router {
 
     if (!name || !password || !team) {
       res.status(400).json({ error: "name, password and team required" });
+      return;
+    }
+    if (!TEAM_NAMES.includes(team)) {
+      res.status(400).json({ error: "invalid team" });
       return;
     }
 

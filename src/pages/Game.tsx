@@ -77,8 +77,8 @@ export default function Game() {
   }
 
   return (
-<>
-  <Chat
+    <>
+      <Chat
         generalMessages={state.chatGeneral}
         teamMessages={state.chatTeam}
         isConnected={state.connected}
@@ -86,31 +86,34 @@ export default function Game() {
         onSendTeam={(text) => sendTeamChat({ text })}
         teamLabel={state.userTeam}
       />
-    <main className="game-layout">
-      <section className="game-main">
-        <div className="game-left">
-          <header className="game-header">
-            <h1>ColorWars</h1>
-            <p>
-              Player: <strong>{state.name || "..."}</strong> | Status:{" "}
-              <strong>{state.connected ? "connected" : "disconnected"}</strong>
-            </p>
-            {state.self && (
+      <main className="game-layout">
+        <section className="game-main">
+          <div className="game-left">
+            <header className="game-header">
+              <h1>ColorWars</h1>
               <p>
-                Team color: <strong style={{ color: selfTeamColor }}>{state.teams[state.self.teamIndex]?.name}</strong>{" "}
-                | Moves: <strong>{state.self.moves}/5</strong> | Regen:{" "}
-                <strong>{Math.ceil(state.self.msToNextMove / 1000)}s</strong>
+                Player: <strong>{state.name || "..."}</strong> | Status:{" "}
+                <strong>{state.connected ? "connected" : "disconnected"}</strong>
               </p>
-            )}
-            <p>Controls: arrows + ZQSD</p>
-            {state.error && <p className="error">{state.error}</p>}
-          </header>
-          <div className="canvas-wrap">
-            <canvas ref={canvasRef} className="game-canvas" />
+              {state.self && (
+                <p>
+                  Team color:{" "}
+                  <strong style={{ color: selfTeamColor }}>
+                    {state.teams[state.self.teamIndex]?.name}
+                  </strong>{" "}
+                  | Moves: <strong>{state.self.moves}/5</strong> | Regen:{" "}
+                  <strong>{Math.ceil(state.self.msToNextMove / 1000)}s</strong>
+                </p>
+              )}
+              <p>Controls: arrows</p>
+            </header>
+            <div className="canvas-wrap">
+              <canvas ref={canvasRef} className="game-canvas" />
+            </div>
           </div>
-        </div>
-        <Leaderboard rows={leaderboardRows} />
-      </section>
-    </main>
+          <Leaderboard rows={leaderboardRows} />
+        </section>
+      </main>
+    </>
   );
 }

@@ -8,6 +8,9 @@ export const TEAMS = [
   { name: "Purple", color: "#9333ea" },
 ] as const;
 
+export type TeamName = (typeof TEAMS)[number]["name"];
+export const TEAM_NAMES = TEAMS.map((team) => team.name) as TeamName[];
+
 export type Direction = "up" | "down" | "left" | "right";
 
 export type TeamIndex = 0 | 1 | 2 | 3;
@@ -63,7 +66,7 @@ export type ChatMessage = {
   user: {
     id: string;
     name: string;
-    team: string;
+    team: TeamName;
   };
   text: string;
   createdAt: number;

@@ -15,6 +15,5 @@ export function keyToDirection(key: string): Direction | null {
   if (lower === "arrowright") {
     return "right";
   }
-
   return null;
 }

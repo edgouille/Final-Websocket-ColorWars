@@ -60,7 +60,8 @@ body {
   font-size: 0.95rem;
 }
 
-.field input {
+.field input,
+.field select {
   padding: 0.6rem 0.75rem;
   border: 1px solid #475569;
   border-radius: 6px;

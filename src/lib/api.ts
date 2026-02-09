@@ -1,10 +1,12 @@
+import type { TeamName } from "../../shared/game";
+
 export type AuthResponse = {
-  user: { uid: string; name: string; team: string };
+  user: { uid: string; name: string; team: TeamName };
   token: string;
 };
 
 export type MeResponse = {
-  user: { uid: string; name: string; team: string };
+  user: { uid: string; name: string; team: TeamName };
 };
 
 export async function postJson<T>(

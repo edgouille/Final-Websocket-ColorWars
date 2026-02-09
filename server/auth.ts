@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "./config.js";
 import type { AuthUser } from "./types/auth.js";
+import { TEAM_NAMES } from "../shared/game.js";
 
 export function createToken(payload: AuthUser): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
@@ -16,7 +17,7 @@ export function verifyToken(token: string): AuthUser {
   const uid = String(decoded.uid ?? "");
   const name = String(decoded.name ?? "");
   const team = String(decoded.team ?? "");
-  if (!uid || !name || !team) {
+  if (!uid || !name || !team || !TEAM_NAMES.includes(team)) {
     throw new Error("Invalid token payload");
   }
 

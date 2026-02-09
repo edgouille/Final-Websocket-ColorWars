@@ -1,7 +1,9 @@
+import type { TeamName } from "../../shared/game.js";
+
 export type AuthUser = {
   uid: string;
   name: string;
-  team: string;
+  team: TeamName;
 };
 
 export type LoginBody = {
@@ -12,5 +14,5 @@ export type LoginBody = {
 export type RegisterBody = {
   name?: string;
   password?: string;
-  team?: string;
+  team?: TeamName;
 };
