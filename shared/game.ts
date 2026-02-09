@@ -1,6 +1,6 @@
 export const MAP_SIZE = 50;
 export const MAX_MOVES = 5;
-export const MOVE_REGEN_MS = 2_000;
+export const MOVE_REGEN_MS = 500;
 export const TEAMS = [
   { name: "Blue", color: "#2563eb" },
   { name: "Green", color: "#16a34a" },
