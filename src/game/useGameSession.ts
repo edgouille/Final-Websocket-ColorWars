@@ -88,12 +88,18 @@ export function useGameSession(token: string | null): {
     socket.on("game:patch", (payload: GamePatchPayload) => {
       setState((prev) => {
         if (prev.map.length === 0) {
-          return { ...prev, players: payload.players };
+          return {
+            ...prev,
+            map: payload.map ?? prev.map,
+            players: payload.players,
+          };
         }
 
-        const nextMap = [...prev.map];
-        const index = payload.painted.y * mapSizeRef.current + payload.painted.x;
-        nextMap[index] = payload.painted.teamIndex;
+        const nextMap = payload.map ? payload.map : [...prev.map];
+        if (!payload.map) {
+          const index = payload.painted.y * mapSizeRef.current + payload.painted.x;
+          nextMap[index] = payload.painted.teamIndex;
+        }
 
         return {
           ...prev,

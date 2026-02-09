@@ -43,6 +43,7 @@ export type GamePatchPayload = {
     teamIndex: TeamIndex;
   };
   players: RemotePlayer[];
+  map?: number[];
 };
 
 export type PlayersPayload = {
