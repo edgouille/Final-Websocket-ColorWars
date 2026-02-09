@@ -160,6 +160,18 @@ export class GameState {
       if (y < size - 1) {
         tryEnqueue(index + size);
       }
+      if (x > 0 && y > 0) {
+        tryEnqueue(index - size - 1);
+      }
+      if (x < size - 1 && y > 0) {
+        tryEnqueue(index - size + 1);
+      }
+      if (x > 0 && y < size - 1) {
+        tryEnqueue(index + size - 1);
+      }
+      if (x < size - 1 && y < size - 1) {
+        tryEnqueue(index + size + 1);
+      }
     }
 
     let changed = false;
