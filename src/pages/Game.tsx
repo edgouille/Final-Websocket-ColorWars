@@ -3,11 +3,12 @@ import { drawGame } from "../game/drawGame";
 import { keyToDirection } from "../game/keybindings";
 import { useGameSession } from "../game/useGameSession";
 import { getToken } from "../lib/api";
+import Chat from "../components/Chat"; 
 
 export default function Game() {
   const token = getToken();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const { state, emitMove } = useGameSession(token);
+  const { state, emitMove, sendChat, sendTeamChat } = useGameSession(token);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -49,26 +50,36 @@ export default function Game() {
   }
 
   return (
-    <main className="game-layout">
-      <header className="game-header">
-        <h1>ColorWars</h1>
-        <p>
-          Player: <strong>{state.name || "..."}</strong> | Status:{" "}
-          <strong>{state.connected ? "connected" : "disconnected"}</strong>
-        </p>
-        {state.self && (
+    <>
+      <Chat
+        generalMessages={state.chatGeneral}
+        teamMessages={state.chatTeam}
+        isConnected={state.connected}
+        onSendGeneral={(text) => sendChat({ text })}
+        onSendTeam={(text) => sendTeamChat({ text })}
+        teamLabel={state.userTeam}
+      />
+      <main className="game-layout">
+        <header className="game-header">
+          <h1>ColorWars</h1>
           <p>
-            Team color: <strong style={{ color: selfTeamColor }}>{state.teams[state.self.teamIndex]?.name}</strong>{" "}
-            | Moves: <strong>{state.self.moves}/5</strong> | Regen:{" "}
-            <strong>{Math.ceil(state.self.msToNextMove / 1000)}s</strong>
+            Player: <strong>{state.name || "..."}</strong> | Status:{" "}
+            <strong>{state.connected ? "connected" : "disconnected"}</strong>
           </p>
-        )}
-        <p>Controls: arrows + ZQSD</p>
-        {state.error && <p className="error">{state.error}</p>}
-      </header>
-      <section className="canvas-wrap">
-        <canvas ref={canvasRef} className="game-canvas" />
-      </section>
-    </main>
+          {state.self && (
+            <p>
+              Team color: <strong style={{ color: selfTeamColor }}>{state.teams[state.self.teamIndex]?.name}</strong>{" "}
+              | Moves: <strong>{state.self.moves}/5</strong> | Regen:{" "}
+              <strong>{Math.ceil(state.self.msToNextMove / 1000)}s</strong>
+            </p>
+          )}
+          <p>Controls: arrows + ZQSD</p>
+          {state.error && <p className="error">{state.error}</p>}
+        </header>
+        <section className="canvas-wrap">
+          <canvas ref={canvasRef} className="game-canvas" />
+        </section>
+      </main>
+    </>
   );
 }

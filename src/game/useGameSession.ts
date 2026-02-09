@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import type {
+  ChatHistoryPayload,
+  ChatMessagePayload,
+  ChatSendPayload,
+  TeamChatHistoryPayload,
+  TeamChatMessagePayload,
+  TeamChatSendPayload,
   Direction,
   GameInitPayload,
   GamePatchPayload,
@@ -12,6 +18,7 @@ import type { GameClientState } from "./types";
 
 const initialState: GameClientState = {
   name: "",
+  userTeam: "",
   mapSize: 200,
   map: [],
   teams: [],
@@ -19,11 +26,15 @@ const initialState: GameClientState = {
   self: null,
   connected: false,
   error: "",
+  chatGeneral: [],
+  chatTeam: [],
 };
 
 export function useGameSession(token: string | null): {
   state: GameClientState;
   emitMove: (direction: Direction) => void;
+  sendChat: (payload: ChatSendPayload) => void;
+  sendTeamChat: (payload: TeamChatSendPayload) => void;
 } {
   const [state, setState] = useState<GameClientState>(initialState);
   const socketRef = useRef<Socket | null>(null);
@@ -36,7 +47,7 @@ export function useGameSession(token: string | null): {
 
     getMe(token)
       .then((res) => {
-        setState((prev) => ({ ...prev, name: res.user.name }));
+        setState((prev) => ({ ...prev, name: res.user.name, userTeam: res.user.team }));
       })
       .catch(() => {
         clearToken();
@@ -111,6 +122,22 @@ export function useGameSession(token: string | null): {
       setState((prev) => ({ ...prev, self: payload.self }));
     });
 
+    socket.on("chat:history", (payload: ChatHistoryPayload) => {
+      setState((prev) => ({ ...prev, chatGeneral: payload.messages }));
+    });
+
+    socket.on("chat:message", (payload: ChatMessagePayload) => {
+      setState((prev) => ({ ...prev, chatGeneral: [...prev.chatGeneral, payload.message] }));
+    });
+
+    socket.on("chat:team:history", (payload: TeamChatHistoryPayload) => {
+      setState((prev) => ({ ...prev, chatTeam: payload.messages }));
+    });
+
+    socket.on("chat:team:message", (payload: TeamChatMessagePayload) => {
+      setState((prev) => ({ ...prev, chatTeam: [...prev.chatTeam, payload.message] }));
+    });
+
     socket.on("game:reject", (payload: { reason: string }) => {
       setState((prev) => ({ ...prev, error: payload.reason }));
     });
@@ -125,5 +152,13 @@ export function useGameSession(token: string | null): {
     socketRef.current?.emit("game:move", direction);
   }, []);
 
-  return { state, emitMove };
+  const sendChat = useCallback((payload: ChatSendPayload): void => {
+    socketRef.current?.emit("chat:send", payload);
+  }, []);
+
+  const sendTeamChat = useCallback((payload: TeamChatSendPayload): void => {
+    socketRef.current?.emit("chat:team:send", payload);
+  }, []);
+
+  return { state, emitMove, sendChat, sendTeamChat };
 }

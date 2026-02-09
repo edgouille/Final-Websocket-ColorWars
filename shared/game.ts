@@ -56,3 +56,32 @@ export type SelfUpdatePayload = {
 export type RejectPayload = {
   reason: string;
 };
+
+export type ChatMessage = {
+  id: string;
+  user: {
+    id: string;
+    name: string;
+    team: string;
+  };
+  text: string;
+  createdAt: number;
+};
+
+export type ChatSendPayload = {
+  text: string;
+};
+
+export type ChatMessagePayload = {
+  message: ChatMessage;
+};
+
+export type ChatHistoryPayload = {
+  messages: ChatMessage[];
+};
+
+export type TeamChatSendPayload = ChatSendPayload;
+
+export type TeamChatMessagePayload = ChatMessagePayload;
+
+export type TeamChatHistoryPayload = ChatHistoryPayload;

@@ -1,4 +1,4 @@
-import type { RemotePlayer, SelfState } from "../../shared/game";
+import type { ChatMessage, RemotePlayer, SelfState } from "../../shared/game";
 
 export type TeamInfo = {
   name: string;
@@ -7,6 +7,7 @@ export type TeamInfo = {
 
 export type GameClientState = {
   name: string;
+  userTeam: string;
   mapSize: number;
   map: number[];
   teams: TeamInfo[];
@@ -14,4 +15,6 @@ export type GameClientState = {
   self: SelfState | null;
   connected: boolean;
   error: string;
+  chatGeneral: ChatMessage[];
+  chatTeam: ChatMessage[];
 };
