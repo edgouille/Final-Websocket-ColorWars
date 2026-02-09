@@ -4,11 +4,12 @@ import { drawGame } from "../game/drawGame";
 import { keyToDirection } from "../game/keybindings";
 import { useGameSession } from "../game/useGameSession";
 import { getToken } from "../lib/api";
+import Chat from "../components/Chat"; 
 
 export default function Game() {
   const token = getToken();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const { state, emitMove } = useGameSession(token);
+  const { state, emitMove, sendChat, sendTeamChat } = useGameSession(token);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -76,6 +77,15 @@ export default function Game() {
   }
 
   return (
+<>
+  <Chat
+        generalMessages={state.chatGeneral}
+        teamMessages={state.chatTeam}
+        isConnected={state.connected}
+        onSendGeneral={(text) => sendChat({ text })}
+        onSendTeam={(text) => sendTeamChat({ text })}
+        teamLabel={state.userTeam}
+      />
     <main className="game-layout">
       <section className="game-main">
         <div className="game-left">

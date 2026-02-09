@@ -1,6 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { Server, type Socket } from "socket.io";
 import type { Server as HttpServer } from "node:http";
 import type {
+  ChatHistoryPayload,
+  ChatMessagePayload,
+  ChatSendPayload,
+  TeamChatHistoryPayload,
+  TeamChatMessagePayload,
+  TeamChatSendPayload,
   Direction,
   GameInitPayload,
   GamePatchPayload,
@@ -18,10 +25,16 @@ type ServerToClientEvents = {
   "game:players": (payload: PlayersPayload) => void;
   "game:self": (payload: SelfUpdatePayload) => void;
   "game:reject": (payload: RejectPayload) => void;
+  "chat:message": (payload: ChatMessagePayload) => void;
+  "chat:history": (payload: ChatHistoryPayload) => void;
+  "chat:team:message": (payload: TeamChatMessagePayload) => void;
+  "chat:team:history": (payload: TeamChatHistoryPayload) => void;
 };
 
 type ClientToServerEvents = {
   "game:move": (direction: Direction) => void;
+  "chat:send": (payload: ChatSendPayload) => void;
+  "chat:team:send": (payload: TeamChatSendPayload) => void;
 };
 
 type SocketData = {
@@ -36,6 +49,9 @@ export function registerGameSocket(httpServer: HttpServer): void {
     },
   );
   const game = new GameState();
+  const chatMessages: ChatHistoryPayload["messages"] = [];
+  const teamChatMessages = new Map<string, TeamChatHistoryPayload["messages"]>();
+  const maxChatMessages = 100;
   const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   io.use((socket, next) => {
@@ -54,6 +70,7 @@ export function registerGameSocket(httpServer: HttpServer): void {
   });
 
   io.on("connection", (socket) => {
+    handleConnection(io, game, socket, chatMessages, teamChatMessages, maxChatMessages);
     const uid = socket.data.user.uid;
     const pending = disconnectTimers.get(uid);
     if (pending) {
@@ -61,7 +78,7 @@ export function registerGameSocket(httpServer: HttpServer): void {
       disconnectTimers.delete(uid);
     }
 
-    handleConnection(io, game, socket, disconnectTimers);
+    //handleConnection(io, game, socket, disconnectTimers);
   });
 
   setInterval(() => {
@@ -76,6 +93,9 @@ function handleConnection(
   io: Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>,
   game: GameState,
   socket: Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>,
+  chatMessages: ChatHistoryPayload["messages"],
+  teamChatMessages: Map<string, TeamChatHistoryPayload["messages"]>,
+  maxChatMessages: number,
   disconnectTimers: Map<string, ReturnType<typeof setTimeout>>,
 ): void {
   const joined = game.connectPlayer(socket.id, socket.data.user);
@@ -86,6 +106,16 @@ function handleConnection(
   }
 
   socket.emit("game:init", joined.init);
+  socket.broadcast.emit("game:patch", {
+    painted: joined.painted,
+    players: game.getPublicPlayers(),
+  });
+  socket.emit("chat:history", { messages: chatMessages });
+
+  const teamRoom = getTeamRoom(socket.data.user.team);
+  socket.join(teamRoom);
+  const teamMessages = getTeamBuffer(teamChatMessages, teamRoom);
+  socket.emit("chat:team:history", { messages: teamMessages });
   if (joined.kind === "spawn") {
     socket.broadcast.emit("game:patch", {
       painted: joined.painted,
@@ -114,6 +144,57 @@ function handleConnection(
     socket.emit("game:self", { self: result.self });
   });
 
+  socket.on("chat:send", (payload) => {
+    const text = payload.text.trim();
+    if (!text) {
+      return;
+    }
+
+    const message = {
+      id: randomUUID(),
+      user: {
+        id: socket.data.user.uid,
+        name: socket.data.user.name,
+        team: socket.data.user.team,
+      },
+      text: text.slice(0, 280),
+      createdAt: Date.now(),
+    };
+
+    chatMessages.push(message);
+    if (chatMessages.length > maxChatMessages) {
+      chatMessages.splice(0, chatMessages.length - maxChatMessages);
+    }
+
+    io.emit("chat:message", { message });
+  });
+
+  socket.on("chat:team:send", (payload) => {
+    const text = payload.text.trim();
+    if (!text) {
+      return;
+    }
+
+    const message = {
+      id: randomUUID(),
+      user: {
+        id: socket.data.user.uid,
+        name: socket.data.user.name,
+        team: socket.data.user.team,
+      },
+      text: text.slice(0, 280),
+      createdAt: Date.now(),
+    };
+
+    const teamMessages = getTeamBuffer(teamChatMessages, teamRoom);
+    teamMessages.push(message);
+    if (teamMessages.length > maxChatMessages) {
+      teamMessages.splice(0, teamMessages.length - maxChatMessages);
+    }
+
+    io.to(teamRoom).emit("chat:team:message", { message });
+  });
+
   socket.on("disconnect", () => {
     const uid = socket.data.user.uid;
     const existingTimer = disconnectTimers.get(uid);
@@ -132,4 +213,21 @@ function handleConnection(
 
     disconnectTimers.set(uid, timer);
   });
+}
+
+function getTeamRoom(team: string): string {
+  return `team:${team}`;
+}
+
+function getTeamBuffer(
+  teamChatMessages: Map<string, TeamChatHistoryPayload["messages"]>,
+  teamRoom: string,
+): TeamChatHistoryPayload["messages"] {
+  const existing = teamChatMessages.get(teamRoom);
+  if (existing) {
+    return existing;
+  }
+  const created: TeamChatHistoryPayload["messages"] = [];
+  teamChatMessages.set(teamRoom, created);
+  return created;
 }
