@@ -41,6 +41,7 @@ const DIRECTION_VECTORS: Record<Direction, readonly [number, number]> = {
 export class GameState {
   private readonly map: Int16Array = new Int16Array(MAP_SIZE * MAP_SIZE).fill(-1);
   private readonly playersBySocket = new Map<string, PlayerState>();
+  private readonly playersByUid = new Map<string, PlayerState>();
   private readonly occupiedByIndex = new Map<number, string>();
 
   private toIndex(x: number, y: number): number {
@@ -136,10 +137,31 @@ export class GameState {
     }));
   }
 
-  public addPlayer(
+  public connectPlayer(
     socketId: string,
     user: AuthUser,
-  ): { player: PlayerState; init: GameInitPayload; painted: { x: number; y: number; teamIndex: TeamIndex } } | null {
+  ):
+    | { kind: "spawn"; init: GameInitPayload; painted: { x: number; y: number; teamIndex: TeamIndex } }
+    | { kind: "reconnect"; init: GameInitPayload }
+    | null {
+    const existing = this.playersByUid.get(user.uid);
+    if (existing) {
+      this.playersBySocket.delete(existing.socketId);
+      existing.socketId = socketId;
+      this.playersBySocket.set(socketId, existing);
+
+      return {
+        kind: "reconnect",
+        init: {
+          mapSize: MAP_SIZE,
+          map: Array.from(this.map),
+          teams: TEAMS,
+          players: this.getPublicPlayers(),
+          self: this.toSelfState(existing),
+        },
+      };
+    }
+
     const teamIndex = this.pickLeastPopulatedTeam();
     const position = this.randomFreePosition();
     if (!position) {
@@ -159,11 +181,12 @@ export class GameState {
     };
 
     this.playersBySocket.set(socketId, player);
+    this.playersByUid.set(user.uid, player);
     this.occupiedByIndex.set(spawnIndex, socketId);
     this.map[spawnIndex] = teamIndex;
 
     return {
-      player,
+      kind: "spawn",
       init: {
         mapSize: MAP_SIZE,
         map: Array.from(this.map),
@@ -183,6 +206,7 @@ export class GameState {
 
     this.occupiedByIndex.delete(this.toIndex(player.x, player.y));
     this.playersBySocket.delete(socketId);
+    this.playersByUid.delete(player.uid);
     return true;
   }
 
